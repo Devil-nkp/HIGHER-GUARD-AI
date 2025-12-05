@@ -1,0 +1,12 @@
+flask
+numpy
+pandas
+opencv-python-headless
+pytesseract
+easyocr
+Pillow
+nltk
+spacy
+scikit-learn
+pdf2image
+gunicorn
