@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HireGuard AI | Job Fraud Detection</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.waves.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --accent: #4895ef;
+            --success: #4cc9f0;
+            --warning: #f8961e;
+            --danger: #f72585;
+            --dark: #0f0f1a;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            background-color: var(--dark);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        #vanta-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+        }
+
+        /* --- SECTIONS --- */
+        section {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            transition: opacity 0.5s ease;
+        }
+
+        .hidden { display: none !important; }
+
+        /* --- LANDING PAGE --- */
+        .landing-content {
+            text-align: center;
+            max-width: 800px;
+            z-index: 2;
+        }
+
+        .hero-title {
+            font-size: 4rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(90deg, #fff, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 30px rgba(67, 97, 238, 0.3);
+        }
+
+        .hero-desc {
+            font-size: 1.25rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+        }
+
+        /* --- APP PAGE --- */
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .header { text-align: center; margin-bottom: 3rem; }
+        .logo { font-size: 2rem; font-weight: 700; color: white; }
+
+        /* Upload Card */
+        .upload-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 2.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            margin-bottom: 2rem;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(67, 97, 238, 0.3);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .upload-area:hover, .upload-area.active {
+            border-color: var(--accent);
+            background: rgba(67, 97, 238, 0.05);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            border: none;
+            transition: 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            box-shadow: 0 4px 20px rgba(67, 97, 238, 0.4);
+        }
+
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 6px 25px rgba(67, 97, 238, 0.5); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* Results */
+        .results-section {
+            display: none;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            animation: fadeIn 0.5s ease;
+        }
+
+        .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        
+        .score-badge {
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            font-weight: 700;
+        }
+        .score-high { background: rgba(247, 37, 133, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+        .score-low { background: rgba(76, 201, 240, 0.2); color: var(--success); border: 1px solid var(--success); }
+
+        .risk-list li {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 24px; height: 24px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    </style>
+</head>
+<body>
+    <div id="vanta-bg"></div>
+
+    <section id="landing-page">
+        <div class="landing-content">
+            <h1 class="hero-title">HireGuard AI</h1>
+            <p class="hero-desc">
+                Don't let fake job postings ruin your career. <br>
+                Our <strong>UltraStrong AI</strong> uses advanced OCR and fraud detection algorithms to analyze job posts with industry-leading accuracy.
+            </p>
+            <button class="btn btn-primary" onclick="showApp()">
+                Get Started <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </section>
+
+    <section id="app-page" class="hidden">
+        <div class="container">
+            <header class="header">
+                <div class="logo">HireGuard Analysis</div>
+            </header>
+
+            <div class="upload-card">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: var(--accent); margin-bottom: 1rem;"></i>
+                    <h3 style="margin-bottom: 0.5rem;">Upload Job Post</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Supports JPG, PNG, PDF</p>
+                    <input type="file" id="fileInput" hidden accept="image/*,.pdf">
+                    <button class="btn btn-primary" id="selectBtn">Select File</button>
+                </div>
+                
+                <div id="file-info" style="text-align: center; margin-top: 1rem; display: none;">
+                    <p id="filename" style="margin-bottom: 1rem;"></p>
+                    <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeFile()">
+                        Analyze Now
+                    </button>
+                </div>
+            </div>
+
+            <div id="results" class="results-section">
+                <div class="result-header">
+                    <h2>Analysis Report</h2>
+                    <div id="score-badge" class="score-badge"></div>
+                </div>
+                
+                <h3 style="margin-bottom: 1rem;">Detected Risk Factors:</h3>
+                <ul id="risk-list" class="risk-list"></ul>
+
+                <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <h4>Extracted Text Preview:</h4>
+                    <p id="text-preview" style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;"></p>
+                </div>
+                
+                <button class="btn btn-primary" style="margin-top: 2rem; background: transparent; border: 1px solid white;" onclick="resetApp()">
+                    Analyze Another
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // --- VANTA BG INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            VANTA.WAVES({
+                el: "#vanta-bg",
+                mouseControls: true,
+                touchControls: true,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                scale: 1.00,
+                scaleMobile: 1.00,
+                color: 0x4361ee,
+                shininess: 50.00,
+                waveHeight: 15.00,
+                waveSpeed: 0.80,
+                zoom: 0.75
+            });
+        });
+
+        // --- NAVIGATION ---
+        function showApp() {
+            document.getElementById('landing-page').classList.add('hidden');
+            document.getElementById('app-page').classList.remove('hidden');
+        }
+
+        // --- FILE HANDLING ---
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const selectBtn = document.getElementById('selectBtn');
+        const fileInfo = document.getElementById('file-info');
+        const filenameDisplay = document.getElementById('filename');
+
+        selectBtn.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if(e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('active');
+        });
+
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('active'));
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('active');
+            if(e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            uploadArea.style.display = 'none';
+            fileInfo.style.display = 'block';
+            filenameDisplay.innerText = `Selected: ${file.name}`;
+        }
+
+        // --- API & LOGIC ---
+        async function analyzeFile() {
+            const btn = document.getElementById('analyzeBtn');
+            const resultsDiv = document.getElementById('results');
+            const file = fileInput.files[0];
+
+            if(!file) return;
+
+            // UI Loading State
+            btn.innerHTML = '<div class="spinner"></div> Processing...';
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+
+                if(data.success) {
+                    displayResult(data);
+                } else {
+                    alert('Error: ' + data.error);
+                    resetApp();
+                }
+
+            } catch (error) {
+                alert('Analysis failed. Please try again.');
+                console.error(error);
+                resetApp();
+            }
+        }
+
+        function displayResult(data) {
+            document.getElementById('file-info').style.display = 'none';
+            const resultsDiv = document.getElementById('results');
+            const badge = document.getElementById('score-badge');
+            const riskList = document.getElementById('risk-list');
+            const preview = document.getElementById('text-preview');
+
+            resultsDiv.style.display = 'block';
+
+            // Set Badge
+            if(data.is_fake) {
+                badge.className = 'score-badge score-high';
+                badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> High Fraud Risk';
+            } else {
+                badge.className = 'score-badge score-low';
+                badge.innerHTML = '<i class="fas fa-check-circle"></i> Low Risk / Legitimate';
+            }
+
+            // Set Risks
+            riskList.innerHTML = '';
+            data.risk_factors.forEach(factor => {
+                const li = document.createElement('li');
+                li.innerHTML = data.is_fake ? `<i class="fas fa-times" style="color:var(--danger)"></i> ${factor}` : `<i class="fas fa-check" style="color:var(--success)"></i> ${factor}`;
+                riskList.appendChild(li);
+            });
+
+            // Set Preview
+            preview.innerText = data.extracted_text_preview;
+        }
+
+        function resetApp() {
+            fileInput.value = '';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('file-info').style.display = 'none';
+            document.getElementById('uploadArea').style.display = 'block';
+            document.getElementById('analyzeBtn').innerHTML = 'Analyze Now';
+            document.getElementById('analyzeBtn').disabled = false;
+        }
+    </script>
+</body>
+</html>
