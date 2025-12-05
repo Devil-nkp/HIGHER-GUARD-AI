@@ -6,8 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # Install system dependencies
-# CHANGED: Replaced 'libgl1-mesa-glx' with 'libgl1'
+# ADDED: 'build-essential' to fix the gcc error
+# ADDED: 'libgl1' (from the previous fix)
 RUN apt-get update && apt-get install -y \
+    build-essential \
     tesseract-ocr \
     libtesseract-dev \
     poppler-utils \
