@@ -3,7 +3,6 @@ numpy
 pandas
 opencv-python-headless
 pytesseract
-easyocr
 Pillow
 nltk
 spacy
