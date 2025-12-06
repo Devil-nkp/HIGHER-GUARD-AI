@@ -4,11 +4,10 @@ import re
 import cv2
 import numpy as np
 import pytesseract
-import easyocr
 import nltk
 import spacy
 from flask import Flask, render_template, request, jsonify
-from PIL import Image, ImageEnhance
+from PIL import Image
 from nltk.sentiment import SentimentIntensityAnalyzer
 from pdf2image import convert_from_bytes
 
@@ -20,6 +19,7 @@ app = Flask(__name__)
 # Download NLTK data
 nltk.download('vader_lexicon', quiet=True)
 nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True) # Added for newer NLTK versions
 
 # Load Spacy
 try:
@@ -31,7 +31,6 @@ except:
 
 # Initialize Analyzer
 sia = SentimentIntensityAnalyzer()
-reader = easyocr.Reader(['en'], gpu=False) # CPU for Render
 
 # --- CORE LOGIC CLASS ---
 
@@ -43,13 +42,13 @@ class UltraStrongAnalyzer:
         else:
             gray = image
             
-        # 1. Rescaling
+        # 1. Rescaling (Upscale helps Tesseract accuracy)
         gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
         
         # 2. Denoising
         denoised = cv2.fastNlMeansDenoising(gray)
         
-        # 3. Thresholding (Otsu)
+        # 3. Thresholding (Otsu) for high contrast
         _, thresh = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
         return [gray, denoised, thresh]
@@ -73,23 +72,26 @@ class UltraStrongAnalyzer:
                 if len(open_cv_image.shape) == 3:
                     open_cv_image = open_cv_image[:, :, ::-1].copy() 
 
-                # 1. EasyOCR Extraction (Deep Learning)
-                try:
-                    ez_result = reader.readtext(open_cv_image, detail=0)
-                    text_results.append(" ".join(ez_result))
-                except:
-                    pass
-
-                # 2. Tesseract Extraction (Optical)
+                # Tesseract Extraction (Optical)
+                # We use multiple configs to maximize detection chances
                 processed_versions = self.preprocess_image(open_cv_image)
-                config = '--oem 3 --psm 6'
                 
+                # Config explanation: 
+                # --oem 3: Default engine
+                # --psm 6: Assume a single uniform block of text (good for docs)
+                # --psm 3: Fully automatic page segmentation
+                configs = ['--oem 3 --psm 6', '--oem 3 --psm 3', '--oem 3 --psm 1']
+                
+                page_text = ""
                 for img_ver in processed_versions:
-                    try:
-                        text = pytesseract.image_to_string(img_ver, config=config)
-                        text_results.append(text)
-                    except:
-                        continue
+                    for config in configs:
+                        try:
+                            text = pytesseract.image_to_string(img_ver, config=config)
+                            if len(text) > len(page_text): # Keep the best result
+                                page_text = text
+                        except:
+                            continue
+                text_results.append(page_text)
 
             # Combine and clean text
             full_text = " ".join(text_results)
@@ -102,23 +104,26 @@ class UltraStrongAnalyzer:
     def analyze_text(self, text):
         if len(text) < 50:
             return {
+                "success": True, # Still return success to show the error on UI
                 "is_job_post": False,
-                "error": "Not enough text detected to analyze."
+                "is_fake": False,
+                "risk_score": 0,
+                "confidence": 0,
+                "risk_factors": ["Text extraction failed or text is too short."],
+                "features": {"word_count": 0},
+                "extracted_text_preview": "Could not extract sufficient text."
             }
 
         text_lower = text.lower()
         
         # 1. Job Post Verification
-        job_keywords = ['job', 'hiring', 'role', 'salary', 'resume', 'apply', 'vacancy', 'career', 'position', 'urgent']
+        job_keywords = ['job', 'hiring', 'role', 'salary', 'resume', 'apply', 'vacancy', 'career', 'position', 'urgent', 'team']
         keyword_count = sum(1 for k in job_keywords if k in text_lower)
         
-        if keyword_count < 2:
-             return {"is_job_post": False, "extracted_text_preview": text[:500]}
-
         # 2. Risk Feature Extraction
         features = {
-            'urgency_score': sum(text_lower.count(w) for w in ['urgent', 'immediate', 'asap', 'now']),
-            'money_mentions': sum(text_lower.count(w) for w in ['$', 'salary', 'cash', 'earn', 'daily']),
+            'urgency_score': sum(text_lower.count(w) for w in ['urgent', 'immediate', 'asap', 'now', 'deadline']),
+            'money_mentions': sum(text_lower.count(w) for w in ['$', 'salary', 'cash', 'earn', 'daily', 'weekly pay', 'bonus']),
             'sentiment': sia.polarity_scores(text)['compound'],
             'word_count': len(text.split()),
             'contact_info': len(re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)) + 
@@ -139,13 +144,13 @@ class UltraStrongAnalyzer:
             risk_factors.append("Excessive focus on money with little detail")
             risk_score += 0.4
 
-        # Pattern: Gmail/Yahoo/Hotmail for business
+        # Pattern: Unprofessional Email
         if re.search(r'@(gmail|yahoo|hotmail|outlook)\.com', text_lower):
-            risk_factors.append("Unprofessional email domain (Gmail/Yahoo)")
+            risk_factors.append("Unprofessional email domain (Gmail/Yahoo/etc)")
             risk_score += 0.3
 
         # Pattern: Chat Apps
-        if any(x in text_lower for x in ['whatsapp', 'telegram', 'dm me']):
+        if any(x in text_lower for x in ['whatsapp', 'telegram', 'dm me', 'inbox me']):
             risk_factors.append("Request to connect via WhatsApp/Telegram")
             risk_score += 0.35
 
@@ -202,6 +207,5 @@ def analyze():
         return jsonify({"success": False, "error": str(e)})
 
 if __name__ == '__main__':
-    # Render provides PORT env var
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
